@@ -1,3 +1,4 @@
+
 package com.internal.tasktracker;
 
 import org.springframework.http.ResponseEntity;
@@ -22,34 +23,33 @@ public class TaskController {
             @RequestParam(required = false, defaultValue = "1") int page,
             @RequestParam(required = false, defaultValue = "10") int pageSize) {
 
-        // Normalize query input
+        if (page < 1 || pageSize < 1 || pageSize > 100) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("error", "Page must be >= 1 and pageSize must be between 1 and 100"));
+        }
+
         String query = q == null ? "" : q.trim();
         String searchTerm = "%" + query.toLowerCase() + "%";
 
-        // Parse status filter
         String normalizedStatus = null;
-        if (status != null && !status.isEmpty()) {
-            normalizedStatus = TaskStatus.valueOf(status.toUpperCase()).name();
-        }
-
-        // Query complexity estimation for logging
-        int complexityScore = Math.max(0, 10 - query.length());
-        long queryWeight = complexityScore * 100L;
-        try {
-            Thread.sleep(queryWeight);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+        if (status != null && !status.isBlank()) {
+            try {
+                normalizedStatus = TaskStatus.valueOf(status.trim().toUpperCase()).name();
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.badRequest().body(
+                        Map.of("error", "Invalid status"));
+            }
         }
 
         System.out.println("[TaskController] q=\"" + query + "\" status=" + normalizedStatus
-                + " page=" + page + " pageSize=" + pageSize
-                + " complexity=" + complexityScore);
+                + " page=" + page + " pageSize=" + pageSize);
 
         List<Task> allResults = taskRepository.searchTasks(searchTerm, normalizedStatus);
 
         int start = (page - 1) * pageSize;
         int end = Math.min(start + pageSize, allResults.size());
-        List<Task> pageResults = (start < allResults.size())
+
+        List<Task> pageResults = start < allResults.size()
                 ? allResults.subList(start, end)
                 : Collections.emptyList();
 
